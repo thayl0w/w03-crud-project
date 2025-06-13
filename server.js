@@ -1,43 +1,37 @@
 const express = require('express');
 const mongoose = require('mongoose');
-require('dotenv').config();
+const cors = require('cors');
 const session = require('express-session');
-const passport = require('passport');
+const passport = require('./config/passport');
+require('dotenv').config();
 const swaggerUi = require('swagger-ui-express');
-const swaggerSpecs = require('./swagger'); // Adjust path if needed
+const swaggerDocument = require('./swagger.json');
 
 const app = express();
 const port = process.env.PORT || 3000;
 
 // Middleware
+app.use(cors());
 app.use(express.json());
-
-// Swagger UI setup
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpecs, {
-  explorer: true,
-  customCss: '.swagger-ui .topbar { display: none }',
-  customSiteTitle: "Book API Documentation"
-}));
-
-// Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI)
-  .then(() => console.log('Connected to MongoDB'))
-  .catch(err => console.error('MongoDB connection error:', err));
 
 // Session middleware
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-secret-key',
   resave: false,
-  saveUninitialized: false,
-  cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 24 * 60 * 60 * 1000 // 24 hours
-  }
+  saveUninitialized: false
 }));
 
 // Initialize Passport
 app.use(passport.initialize());
 app.use(passport.session());
+
+// Swagger UI setup
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocument));
+
+// Connect to MongoDB
+mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/book-api')
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(err => console.error('MongoDB connection error:', err));
 
 // GitHub OAuth setup (if env vars are set)
 if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
