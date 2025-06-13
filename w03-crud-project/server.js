@@ -10,15 +10,30 @@ const swaggerDocument = require('./swagger.json');
 const app = express();
 const port = process.env.PORT || 3000;
 
+// CORS configuration
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? process.env.BASE_URL 
+    : 'http://localhost:3000',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 // Middleware
-app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Session middleware
 app.use(session({
   secret: process.env.SESSION_SECRET || 'your-secret-key',
   resave: false,
-  saveUninitialized: false
+  saveUninitialized: false,
+  cookie: {
+    secure: process.env.NODE_ENV === 'production',
+    httpOnly: true,
+    maxAge: 24 * 60 * 60 * 1000 // 24 hours
+  }
 }));
 
 // Initialize Passport
@@ -33,7 +48,7 @@ mongoose.connect(process.env.MONGODB_URI || 'mongodb://localhost:27017/book-api'
   .then(() => console.log('Connected to MongoDB'))
   .catch(err => console.error('MongoDB connection error:', err));
 
-// GitHub OAuth setup (if env vars are set)
+// GitHub OAuth setup
 if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
   const GitHubStrategy = require('passport-github2').Strategy;
 
@@ -46,10 +61,20 @@ if (process.env.GITHUB_CLIENT_ID && process.env.GITHUB_CLIENT_SECRET) {
   }));
 
   // GitHub auth routes
-  app.get('/auth/github', passport.authenticate('github', { scope: ['user:email'] }));
-  app.get('/auth/github/callback', passport.authenticate('github', { failureRedirect: '/login' }), (req, res) => {
-    res.redirect('/');
-  });
+  app.get('/auth/github', passport.authenticate('github', { 
+    scope: ['user:email'],
+    session: true
+  }));
+
+  app.get('/auth/github/callback', 
+    passport.authenticate('github', { 
+      failureRedirect: '/login',
+      session: true
+    }), 
+    (req, res) => {
+      res.redirect('/');
+    }
+  );
 }
 
 passport.serializeUser((user, done) => {
@@ -91,4 +116,4 @@ app.use((err, req, res, next) => {
 app.listen(port, () => {
   console.log(`Server is running at http://localhost:${port}`);
   console.log(`API Documentation available at http://localhost:${port}/api-docs`);
-});
+}); 
